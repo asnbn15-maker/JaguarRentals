@@ -113,6 +113,7 @@ footer b{color:#fff}
 <section class="band" id="book" style="background:var(--card)">
   <div class="ticket">
     <h2>Request your rental</h2>
+    <div class="sent" id="paidmsg" hidden style="margin-top:16px;border:2px solid var(--red)"></div>
     <div class="steps" aria-hidden="true"><span id="st1" class="on">1. Your trip</span><span id="st2">2. Review and sign</span><span id="st3">3. Send</span></div>
 
     <form id="f1" novalidate class="fade">
@@ -169,13 +170,16 @@ footer b{color:#fff}
     <div id="f3" hidden class="fade">
       <div class="sent">
         <h3 style="font-size:28px;margin-bottom:8px">Last step: send it to us</h3>
-        <p>Tap the button to open WhatsApp with your request ready to send. We confirm availability and send payment details for your booking deposit. Your dates are reserved once the deposit is received.</p>
+        <p>Pay your booking deposit securely by card to reserve your dates, then send us your request on WhatsApp. If the car turns out not to be available for your dates, we refund the deposit in full.</p>
+        <p class="est" style="margin:14px 0"><span id="paylabel">Booking deposit</span><b id="payamt">—</b></p>
         <div class="cta" style="justify-content:flex-start">
-          <a class="btn" id="wa" href="#" target="_blank" rel="noopener">Send on WhatsApp</a>
+          <button class="btn" type="button" id="pay">Pay booking deposit</button>
+          <a class="btn ghost" id="wa" href="#" target="_blank" rel="noopener">Send on WhatsApp</a>
           <button class="btn ghost" type="button" id="copy">Copy request</button>
         </div>
         <p class="note">WhatsApp didn't open? Copy the request and send it to +52 999 268 2268.</p>
         <p class="err" id="e3" style="color:var(--soft)"></p>
+        <p class="note">Card payments are processed by Stripe. Jaguar Rentals never sees your card number.</p>
         <pre id="msg"></pre>
         <button class="btn ghost" type="button" id="edit">Edit request</button>
       </div>
@@ -307,12 +311,27 @@ Date: ${signedAt}`;
     fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()}).catch(()=>{});
   }catch(err){}
   $('wa').href='https://wa.me/529992682268?text='+encodeURIComponent(msg);
+  $('payamt').textContent=fmt(q.book,data.cur);$('paylabel').textContent='Booking deposit (nonrefundable, applied to your total)';
   step(3);
 });
 $('copy').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText($('msg').textContent);$('e3').textContent='Copied. Paste it into WhatsApp.'}
   catch(err){$('e3').textContent='Copy was blocked. Select the text below and copy it.'}
 });
+$('pay').addEventListener('click',async()=>{
+  const btn=$('pay');btn.disabled=true;btn.textContent='Opening secure checkout…';$('e3').textContent='';
+  try{
+    const r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({car:$('car').value,from:$('from').value,to:$('to').value,cur:data.cur,name:data.name,email:data.email,phone:data.phone})});
+    const j=await r.json();
+    if(j.url){window.location.href=j.url;return}
+    throw new Error(j.error||'Payment could not start.');
+  }catch(err){$('e3').textContent=(err&&err.message?err.message:'Payment could not start.')+' You can still send your request on WhatsApp.';btn.disabled=false;btn.textContent='Pay booking deposit'}
+});
+{
+  const qs=new URLSearchParams(location.search).get('paid');
+  if(qs==='1'){$('paidmsg').hidden=false;$('paidmsg').innerHTML='<b>Payment received. Thank you!</b><br>Your booking deposit went through and a receipt is on its way to your email. If you haven\u2019t yet, send us your request on WhatsApp so we can confirm your pickup details.'}
+  else if(qs==='0'){$('paidmsg').hidden=false;$('paidmsg').innerHTML='<b>Payment not completed.</b><br>No charge was made. You can fill in the form again or message us on WhatsApp at +52 999 268 2268.'}
+}
 renderCars();
 }
 </script>
